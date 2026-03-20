@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 Student MIS · Admin Approval Demo</title>
+    <!-- Bootstrap 5 + Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f8fafc; }
+        .navbar-brand { font-weight: 700; letter-spacing: -0.5px; }
+        .card { border: none; border-radius: 24px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.1); transition: 0.2s; }
+        .card:hover { box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15); }
+        .dashboard-card { cursor: pointer; border-radius: 20px; padding: 1.5rem; text-align: center; background: white; height: 100%; }
+        .dashboard-card i { font-size: 2.5rem; margin-bottom: 0.75rem; color: #0d6efd; }
+        .dashboard-card h6 { font-weight: 600; margin-bottom: 0; }
+        .badge-soft { background: #e9ecef; color: #1e293b; font-weight: 500; padding: 0.5rem 1rem; border-radius: 50px; }
+        .btn-rounded { border-radius: 40px; padding: 0.5rem 1.5rem; }
+        .table th { font-weight: 600; color: #475569; border-bottom-width: 1px; }
+        .modal-content { border-radius: 24px; }
+        .list-group-item { border: none; border-bottom: 1px solid #f1f5f9; }
+        .status-badge { font-size: 0.8rem; padding: 0.35rem 0.65rem; border-radius: 50px; }
+        .gradient-bg { background: linear-gradient(145deg, #0d6efd, #0b5ed7); color: white; }
+        .welcome-banner { background: white; border-radius: 30px; padding: 1.5rem 2rem; margin-bottom: 2rem; box-shadow: 0 5px 20px rgba(0,0,0,0.03); }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark gradient-bg px-4 sticky-top">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="#" onclick="showView('home')"><i class="bi bi-mortarboard-fill me-2"></i>EduMIS</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarMain">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0" id="navLinks"></ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Main container -->
+<div class="container py-4" id="appContainer"></div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ========== APPLICATION SCRIPT ========== -->
+<script>
+    (function(){
+        // ---------- DATA STORES (localStorage) ----------
+        const STORAGE = {
+            STUDENTS: 'mis_students_v3',
+            COURSES: 'mis_courses_v3',
+            ENROLLMENTS: 'mis_enrollments_v3',
+            MARKS: 'mis_marks_v3',
+            ROOM_BOOKINGS: 'mis_roomBookings_v3',
+            SPECIAL_REQUESTS: 'mis_specialRequests_v3',
+            TIMETABLES: 'mis_timetables_v3',
+            CURRENT_USER: 'mis_currentUser_v3'
+        };
+
+        // Init default data if missing
+        if (!localStorage.getItem(STORAGE.STUDENTS)) {
+            const defaultStudents = [
+                { id: 1, username: 'student1', password: 'password', name: 'John Doe', email: 'john@example.com', phone: '1234567890', address: '123 Main St', regNumber: 'S12345', faculty: 'Science', department: 'Computer Science', level: 200, idApproved: false, profileApproved: false, clearance: false, status: 'approved' },
+                { id: 2, username: 'jane', password: 'password', name: 'Jane Smith', email: 'jane@example.com', phone: '0987654321', address: '456 Oak Ave', regNumber: 'S67890', faculty: 'Engineering', department: 'Electrical', level: 300, idApproved: true, profileApproved: true, clearance: true, status: 'approved' }
+            ];
+            localStorage.setItem(STORAGE.STUDENTS, JSON.stringify(defaultStudents));
+        }
+
+        if (!localStorage.getItem(STORAGE.COURSES)) {
+            const courses = [
+                { id: 1, code: 'CS101', name: 'Intro to Computing', credits: 3 },
+                { id: 2, code: 'CS102', name: 'Data Structures', credits: 4 },
+                { id: 3, code: 'MATH101', name: 'Calculus I', credits: 3 },
+                { id: 4, code: 'PHY101', name: 'Physics I', credits: 3 }
+            ];
+            localStorage.setItem(STORAGE.COURSES, JSON.stringify(courses));
+        }
+
+        if (!localStorage.getItem(STORAGE.ENROLLMENTS)) localStorage.setItem(STORAGE.ENROLLMENTS, '[]');
+        if (!localStorage.getItem(STORAGE.MARKS)) localStorage.setItem(STORAGE.MARKS, '[]');
+        if (!localStorage.getItem(STORAGE.ROOM_BOOKINGS)) localStorage.setItem(STORAGE.ROOM_BOOKINGS, '[]');
+        if (!localStorage.getItem(STORAGE.SPECIAL_REQUESTS)) localStorage.setItem(STORAGE.SPECIAL_REQUESTS, '[]');
+        if (!localStorage.getItem(STORAGE.TIMETABLES)) {
+            localStorage.setItem(STORAGE.TIMETABLES, JSON.stringify({ class: '📚 No class timetable uploaded.', exam: '📝 No exam timetable uploaded.' }));
+        }
+
+        // Admin account (hardcoded)
+        const ADMIN = { username: 'admin', password: 'admin', name: 'Administrator', role: 'admin' };
+
+        // ---------- GLOBAL STATE ----------
+        let currentUser = null;
+        const saved = localStorage.getItem(STORAGE.CURRENT_USER);
+        if (saved) try { currentUser = JSON.parse(saved); } catch { currentUser = null; }
+
+        // Helper functions
+        function getStudents() { return JSON.parse(localStorage.getItem(STORAGE.STUDENTS)) || []; }
+        function saveStudents(s) { localStorage.setItem(STORAGE.STUDENTS, JSON.stringify(s)); }
+        function getCourses() { return JSON.parse(localStorage.getItem(STORAGE.COURSES)) || []; }
+        function getEnrollments() { return JSON.parse(localStorage.getItem(STORAGE.ENROLLMENTS)) || []; }
+        function saveEnrollments(e) { localStorage.setItem(STORAGE.ENROLLMENTS, JSON.stringify(e)); }
+        function getMarks() { return JSON.parse(localStorage.getItem(STORAGE.MARKS)) || []; }
+        function saveMarks(m) { localStorage.setItem(STORAGE.MARKS, JSON.stringify(m)); }
+        function getRoomBookings() { return JSON.parse(localStorage.getItem(STORAGE.ROOM_BOOKINGS)) || []; }
+        function saveRoomBookings(b) { localStorage.setItem(STORAGE.ROOM_BOOKINGS, JSON.stringify(b)); }
+        function getSpecialRequests() { return JSON.parse(localStorage.getItem(STORAGE.SPECIAL_REQUESTS)) || []; }
+        function saveSpecialRequests(r) { localStorage.setItem(STORAGE.SPECIAL_REQUESTS, JSON.stringify(r)); }
+        function getTimetables() { return JSON.parse(localStorage.getItem(STORAGE.TIMETABLES)) || { class: '', exam: '' }; }
+        function saveTimetables(t) { localStorage.setItem(STORAGE.TIMETABLES, JSON.stringify(t)); }
+
+        // ---------- ROUTING ----------
+        function showView(view, params = {}) {
+            const container = document.getElementById('appContainer');
+            if (!currentUser) {
+                if (view === 'register') renderRegister(container);
+                else renderLogin(container);
+                updateNavbar();
+                return;
+            }
+
+            if (view === 'home') {
+                if (currentUser.role === 'admin') renderAdminDashboard(container);
+                else renderStudentDashboard(container);
+            } else if (view === 'login') { 
+                logout(); 
+                return; 
+            }
+            else if (view === 'register') { renderRegister(container); }
+            else if (currentUser.role === 'student') {
+                switch(view) {
+                    case 'profile': renderStudentProfile(container); break;
+                    case 'updateProfile': renderUpdateProfile(container); break;
+                    case 'changePassword': renderChangePassword(container); break;
+                    case 'fees': renderFees(container); break;
+                    case 'timetables': renderTimetables(container); break;
+                    case 'courses': renderCourseRegistration(container); break;
+                    case 'examCard': renderExamCard(container); break;
+                    case 'bookRoom': renderBookRoom(container); break;
+                    case 'requestSupp': renderRequestSupp(container); break;
+                    case 'results': renderMarks(container); break;
+                    case 'enquiries': renderPlaceholder(container, 'Enquiries', '📬 Submit an enquiry – form would be here.'); break;
+                    case 'studentId': renderStudentId(container); break;
+                    case 'interFaculty': renderPlaceholder(container, 'Inter Faculty Transfer', '↔️ Request inter‑faculty transfer.'); break;
+                    case 'clearance': renderClearance(container); break;
+                    case 'cautionRefund': renderPlaceholder(container, 'Caution Refund', '💰 Caution refund status.'); break;
+                    case 'academicTracking': renderPlaceholder(container, 'Academic Tracking', '📈 Track your academic progress.'); break;
+                    default: renderStudentDashboard(container);
+                }
+            } else if (currentUser.role === 'admin') {
+                switch(view) {
+                    case 'registerStudent': renderRegisterStudent(container); break;
+                    case 'uploadTimetable': renderUploadTimetable(container); break;
+                    case 'feesManagement': renderFeesManagement(container); break;
+                    case 'clearStudent': renderClearStudent(container); break;
+                    case 'approveId': renderApproveId(container); break;
+                    case 'approveProfile': renderApproveProfile(container); break;
+                    case 'approveSupp': renderApproveSupp(container); break;
+                    case 'generateExamCard': renderGenerateExamCard(container); break;
+                    case 'manageStudents': renderManageStudents(container); break;
+                    case 'editStudent': renderEditStudent(container, params.studentId); break;
+                    case 'enterMarks': renderEnterMarks(container, params.studentId); break;
+                    case 'pendingApprovals': renderPendingApprovals(container); break;
+                    default: renderAdminDashboard(container);
+                }
+            }
+            updateNavbar();
+        }
+
+        // ---------- LOGOUT ----------
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem(STORAGE.CURRENT_USER);
+            showView('login');
+        }
+
+        // ---------- LOGIN (with status check) ----------
+        function renderLogin(container) {
+            container.innerHTML = `
+                <div class="row justify-content-center">
+                    <div class="col-md-6 col-lg-5">
+                        <div class="card p-5">
+                            <h2 class="text-center mb-4"><i class="bi bi-box-arrow-in-right me-2"></i>Welcome Back</h2>
+                            <div id="loginAlert" class="alert alert-danger d-none"></div>
+                            <form onsubmit="event.preventDefault(); doLogin();">
+                                <div class="mb-3">
+                                    <label class="form-label fw500">Username</label>
+                                    <input type="text" class="form-control form-control-lg rounded-pill" id="loginUsername" placeholder="student1 or admin">
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label fw500">Password</label>
+                                    <input type="password" class="form-control form-control-lg rounded-pill" id="loginPassword" placeholder="••••••••">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill">Login</button>
+                            </form>
+                            <div class="text-center mt-4">
+                                <span class="text-muted">New student? </span><a href="#" onclick="showView('register')" class="text-decoration-none">Create account</a>
+                            </div>
+                            <hr class="my-4">
+                            <div class="small text-muted text-center">Demo accounts: student1/password, admin/admin</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.doLogin = function() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const alertDiv = document.getElementById('loginAlert');
+            alertDiv.classList.add('d-none');
+
+            // Admin login
+            if (username === ADMIN.username && password === ADMIN.password) {
+                currentUser = { username: 'admin', name: 'Administrator', role: 'admin' };
+                localStorage.setItem(STORAGE.CURRENT_USER, JSON.stringify(currentUser));
+                showView('home');
+                return;
+            }
+
+            // Student login
+            const students = getStudents();
+            const student = students.find(s => s.username === username && s.password === password);
+            if (student) {
+                if (student.status !== 'approved') {
+                    alertDiv.classList.remove('d-none');
+                    alertDiv.innerText = 'Your account is pending admin approval. Please wait.';
+                    return;
+                }
+                currentUser = { id: student.id, username: student.username, name: student.name, role: 'student' };
+                localStorage.setItem(STORAGE.CURRENT_USER, JSON.stringify(currentUser));
+                showView('home');
+            } else {
+                alertDiv.classList.remove('d-none');
+                alertDiv.innerText = 'Invalid credentials.';
+            }
+        };
+
+        // ---------- REGISTRATION (sets status = 'pending') ----------
+        function renderRegister(container) {
+            container.innerHTML = `
+                <div class="row justify-content-center">
+                    <div class="col-lg-8">
+                        <div class="card p-5">
+                            <h2 class="mb-4"><i class="bi bi-pencil-square me-2"></i>Student Registration</h2>
+                            <div id="regAlert" class="alert alert-info">After registration, wait for admin approval.</div>
+                            <form id="registerForm" onsubmit="event.preventDefault(); registerNewStudent();">
+                                <div class="row g-3">
+                                    <div class="col-md-6"><label class="form-label">Username*</label><input type="text" class="form-control" id="regUsername" required></div>
+                                    <div class="col-md-6"><label class="form-label">Password*</label><input type="password" class="form-control" id="regPassword" value="password" required></div>
+                                    <div class="col-md-6"><label class="form-label">Full Name*</label><input type="text" class="form-control" id="regName" required></div>
+                                    <div class="col-md-6"><label class="form-label">Email*</label><input type="email" class="form-control" id="regEmail" required></div>
+                                    <div class="col-md-6"><label class="form-label">Phone</label><input type="text" class="form-control" id="regPhone"></div>
+                                    <div class="col-md-6"><label class="form-label">Reg Number*</label><input type="text" class="form-control" id="regNumber" required></div>
+                                    <div class="col-md-6"><label class="form-label">Faculty</label><input type="text" class="form-control" id="regFaculty" value="Science"></div>
+                                    <div class="col-md-6"><label class="form-label">Department</label><input type="text" class="form-control" id="regDept" value="Computer Science"></div>
+                                    <div class="col-md-6"><label class="form-label">Level</label><input type="number" class="form-control" id="regLevel" value="100"></div>
+                                    <div class="col-12"><label class="form-label">Address</label><textarea class="form-control" id="regAddress" rows="2"></textarea></div>
+                                </div>
+                                <div class="mt-4 d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary btn-lg rounded-pill px-5">Register</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-lg rounded-pill" onclick="showView('login')">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.registerNewStudent = function() {
+            const students = getStudents();
+            const username = document.getElementById('regUsername').value;
+            if (students.some(s => s.username === username)) {
+                alert('Username already exists.');
+                return;
+            }
+            const newId = students.length ? Math.max(...students.map(s => s.id)) + 1 : 1;
+            const newStudent = {
+                id: newId,
+                username,
+                password: document.getElementById('regPassword').value,
+                name: document.getElementById('regName').value,
+                email: document.getElementById('regEmail').value,
+                phone: document.getElementById('regPhone').value,
+                address: document.getElementById('regAddress').value,
+                regNumber: document.getElementById('regNumber').value,
+                faculty: document.getElementById('regFaculty').value,
+                department: document.getElementById('regDept').value,
+                level: parseInt(document.getElementById('regLevel').value) || 100,
+                idApproved: false,
+                profileApproved: false,
+                clearance: false,
+                status: 'pending'
+            };
+            students.push(newStudent);
+            saveStudents(students);
+            alert('Registration successful! Your account is pending admin approval.');
+            showView('login');
+        };
+
+        function updateNavbar() {
+            const nav = document.getElementById('navLinks');
+            if (!currentUser) {
+                nav.innerHTML = '<li class="nav-item"><a class="nav-link text-white" href="#" onclick="showView(\'register\')">Register</a></li>';
+                return;
+            }
+            if (currentUser.role === 'student') {
+                nav.innerHTML = `
+                    <li class="nav-item"><span class="nav-link text-white fw500">👋 ${currentUser.name}</span></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="#" onclick="showView('profile')"><i class="bi bi-person"></i> Profile</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="#" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                `;
+            } else {
+                nav.innerHTML = `
+                    <li class="nav-item"><span class="nav-link text-white fw500">👑 Admin</span></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="#" onclick="logout()"><i class="bi bi-box-arrow-righ
